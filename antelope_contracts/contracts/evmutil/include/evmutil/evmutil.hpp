@@ -166,6 +166,15 @@ class [[eosio::contract]] evmutil : public contract {
      */
     [[eosio::action]] void upstakeimpl(std::string proxy_address);
 
+    /**
+     * @brief Update the address for XSAT proxy.
+     * 
+     * @auth Self
+     * 
+     * @param proxy_address - The proxy address for the XSAT.
+     */
+    [[eosio::action]] void setxsatproxy(std::string proxy_address);
+
     // Public Helpers
     config_t get_config() const;
     void set_config(const config_t &v);
@@ -181,7 +190,7 @@ private:
     // Private Helpers
     void regtokenwithcodebytes(const bytes& erc20_address_bytes, const bytes& impl_address_bytes, const eosio::asset& dep_fee, uint8_t erc20_precision);
 
-    void handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delta_precision);
+    void handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delta_precision, bool is_xsat);
     void handle_utxo_access(const bridge_message_v0 &msg);
     void handle_rewards(const bridge_message_v0 &msg);
 
