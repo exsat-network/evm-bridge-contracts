@@ -69,6 +69,21 @@ namespace endrmng {
         void evmclaim(const name& caller, const checksum160& proxy, const checksum160& staker, const name& validator);
 
         /**
+        * Evm claim reward action.
+        * @auth scope is evmcaller whitelist account
+        *
+        * @param caller - the account that calls the method
+        * @param proxy - proxy address
+        * @param staker - staker address
+        * @param validator - validator address
+        * @param donate_rate - donate rate [0,10000]
+        *
+        */
+        [[eosio::action]]
+        void evmclaim2(const name& caller, const checksum160& proxy, const checksum160& staker, const name& validator,
+                   const uint16_t donate_rate);
+
+        /**
          * validator claim reward action.
          * @auth validator->reward_recipient or evmutil.xsat
          *
@@ -130,6 +145,7 @@ namespace endrmng {
     using evmstake_action = action_wrapper<"evmstake"_n, &contract_actions::evmstake>;
     using evmunstake_action = action_wrapper<"evmunstake"_n, &contract_actions::evmunstake>;
     using evmclaim_action = action_wrapper<"evmclaim"_n, &contract_actions::evmclaim>;
+    using evmclaim2_action = action_wrapper<"evmclaim2"_n, &contract_actions::evmclaim2>;
     using evmnewstake_action = action_wrapper<"evmnewstake"_n, &contract_actions::evmnewstake>;
     using vdrclaim_action = action_wrapper<"vdrclaim"_n, &contract_actions::vdrclaim>;
 
