@@ -60,4 +60,11 @@ namespace evmutil {
     };
     typedef eosio::singleton<"config"_n, config_t> config_singleton_t;
 
+    struct [[eosio::table("xsatproxy")]] [[eosio::contract("evmutil")]] xsatproxy_t {
+        bytes xsat_proxy;
+
+        EOSLIB_SERIALIZE(xsatproxy_t, (xsat_proxy));
+    };
+    typedef eosio::singleton<"xsatproxy"_n, xsatproxy_t> xsatproxy_singleton_t;
+
 } // namespace evmutil

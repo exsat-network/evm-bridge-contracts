@@ -362,7 +362,7 @@ void evmutil::unregtoken(std::string proxy_address) {
     index_symbol.erase(token_table_iter);
 }
 
-void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delta_precision) {
+void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delta_precision, bool is_xsat) {
 
     check(msg.data.size() >= 4, "not enough data in bridge_message_v0");
     config_t config = get_config();
@@ -373,10 +373,26 @@ void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delt
     // 0xec8d3269 : 69328dec : withdraw(address,uint256,address)
     // 0x42b3c021 : 21c0b342 : claim(address,address)
     // 0x2b7d501d : 1d507d2b : restake(address,address,address)
+    // 0xac2fd4fc : fcd42fac : claim2(address,address,uint256)
 
     if (app_type == 0x42b3c021) /* claim(address,address) */{
         check(msg.data.size() >= 4 + 32 /*to*/ + 32 /*from*/, 
-            "not enough data in bridge_message_v0 of application type 0x653332e5");
+            "not enough data in bridge_message_v0 of application type 0x42b3c021");
+        
+        check(!is_xsat, "XSAT stake cannot call claim");
+
+        uint64_t dest_acc;
+        readExSatAccount(msg.data, 4, dest_acc);
+
+        evmc::address sender_addr;
+        readEvmAddress(msg.data, 4 + 32, sender_addr);
+        endrmng::evmclaim_action evmclaim_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+        evmclaim_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc);
+    } else if (app_type == 0xac2fd4fc) /* claim2(address,address,uint256) */{
+        check(msg.data.size() >= 4 + 32 /*to*/ + 32 /*from*/ + 32 /*donate_rate*/, 
+            "not enough data in bridge_message_v0 of application type 0xac2fd4fc");
+        
+        check(!is_xsat, "XSAT stake cannot call claim");
 
         uint64_t dest_acc;
         readExSatAccount(msg.data, 4, dest_acc);
@@ -384,8 +400,15 @@ void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delt
         evmc::address sender_addr;
         readEvmAddress(msg.data, 4 + 32, sender_addr);
 
-        endrmng::evmclaim_action evmclaim_act(config.endrmng_account, {{receiver_account(), "active"_n}});
-        evmclaim_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc);
+        intx::uint256 value;
+        readUint256(msg.data, 4 + 32 + 32, value);
+
+        check(value <= 10000, "donate rate must smaller than 10000");
+
+        uint16_t donate_rate = (uint16_t)value;
+
+        endrmng::evmclaim2_action evmclaim2_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+        evmclaim2_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc, donate_rate);
     } else if (app_type == 0xdc4653f4) /* deposit(address,uint256,address) */{
         check(msg.data.size() >= 4 + 32 + 32 + 32, 
             "not enough data in bridge_message_v0 of application type 0xdc4653f4");
@@ -399,8 +422,13 @@ void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delt
         evmc::address sender_addr;
         readEvmAddress(msg.data, 4 + 32 + 32, sender_addr);
 
-        endrmng::evmstake_action evmstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
-        evmstake_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        if (is_xsat) {
+            endrmng::evmstakexsat_action evmstakexsat_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmstakexsat_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, default_xsat_token_symbol));
+        } else {
+            endrmng::evmstake_action evmstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmstake_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        }
     } else if (app_type == 0xec8d3269) /* withdraw(address,uint256,address) */ {
         check(msg.data.size() >= 4 + 32 + 32 + 32, 
             "not enough data in bridge_message_v0 of application type 0xec8d3269");
@@ -414,8 +442,13 @@ void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delt
         evmc::address sender_addr;
         readEvmAddress(msg.data, 4 + 32 + 32, sender_addr);
         
-        endrmng::evmunstake_action evmunstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
-        evmunstake_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        if (is_xsat) {
+            endrmng::evmunstkxsat_action evmunstkxsat_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmunstkxsat_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, default_xsat_token_symbol));
+        } else {
+            endrmng::evmunstake_action evmunstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmunstake_act.send(get_self(), make_key160(msg.sender), make_key160(sender_addr.bytes, kAddressLength), dest_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        }
     } else if (app_type == 0x2b7d501d) /* restake(address,address,uint256,address) */{
         check(msg.data.size() >= 4 + 32 + 32 + 32 + 32, 
             "not enough data in bridge_message_v0 of application type 0x97fba943");
@@ -432,8 +465,13 @@ void evmutil::handle_endorser_stakes(const bridge_message_v0 &msg, uint64_t delt
         evmc::address sender_addr;
         readEvmAddress(msg.data, 4 + 32 + 32 + 32, sender_addr);
 
-        endrmng::evmnewstake_action evmnewstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
-        evmnewstake_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), from_acc, to_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        if (is_xsat) {
+            endrmng::evmrestkxsat_action evmrestkxsat_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmrestkxsat_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), from_acc, to_acc, eosio::asset(dest_amount, default_xsat_token_symbol));
+        } else {
+            endrmng::evmnewstake_action evmnewstake_act(config.endrmng_account, {{receiver_account(), "active"_n}});
+            evmnewstake_act.send(get_self(), make_key160(msg.sender),make_key160(sender_addr.bytes, kAddressLength), from_acc, to_acc, eosio::asset(dest_amount, config.evm_gas_token_symbol));
+        }
     } else {
         eosio::check(false, "unsupported bridge_message version");
     }
@@ -529,7 +567,12 @@ void evmutil::onbridgemsg(const bridge_message_t &message) {
 
         check(itr != index.end() && itr->address == msg.sender, "ERC-20 token not registerred");
 
-        handle_endorser_stakes(msg, itr->erc20_precision - config.evm_gas_token_symbol.precision());
+        xsatproxy_singleton_t xsatproxy(get_self(), get_self().value);
+        if (xsatproxy.exists() && xsatproxy.get().xsat_proxy == msg.sender) {
+            handle_endorser_stakes(msg, itr->erc20_precision - default_xsat_token_symbol.precision(), true);
+        } else {
+            handle_endorser_stakes(msg, itr->erc20_precision - config.evm_gas_token_symbol.precision(), false);
+        }
     }
 }
 
@@ -692,5 +735,22 @@ void evmutil::upstakeimpl(std::string proxy_address) {
 inline eosio::name evmutil::receiver_account()const {
     return get_self();
 }
+
+void evmutil::setxsatproxy(std::string proxy_address) {
+    require_auth(get_self());
+
+
+    auto address_bytes = from_hex(proxy_address);
+    eosio::check(!!address_bytes, "token address must be valid 0x EVM address");
+    eosio::check(address_bytes->size() == kAddressLength, "invalid length of token address");
+
+    xsatproxy_t v;
+    v.xsat_proxy.resize(kAddressLength);
+    memcpy(&(v.xsat_proxy[0]), address_bytes->data(), kAddressLength);
+
+    xsatproxy_singleton_t xsatproxy(get_self(), get_self().value);
+    xsatproxy.set(v, get_self());
+}
+
 
 }  // namespace evmutil

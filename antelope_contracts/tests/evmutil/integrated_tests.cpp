@@ -125,7 +125,7 @@ struct it_tester : evmutil_tester {
         push_action(endrmng_account,
                     "reset"_n,
                     endrmng_account,
-                    mvo()("proxy",make_key(proxy->bytes, 20))("staker",make_key(evm1.address.bytes, 20))("validator","alice"_n));
+                    mvo()("proxy",make_key(proxy->bytes, 20))("staker",make_key(evm1.address.bytes, 20))("validator","alice"_n)("test_xsat",false));
         produce_block();
 
         push_action(poolreg_account,
@@ -380,6 +380,29 @@ struct it_tester : evmutil_tester {
         auto reserved_addr = silkworm::make_reserved_address(validator.to_uint64_t());
 
         txn.data += evmc::from_hex(address_str32(reserved_addr)).value();      // param1 (to: address)
+
+        auto old_nonce = from.next_nonce;
+        from.sign(txn);
+
+        try {
+            auto r = pushtx(txn);
+            // dlog("action trace: ${a}", ("a", r));
+        } catch (...) {
+            from.next_nonce = old_nonce;
+            throw;
+        }
+    }
+
+    void claim2(evm_eoa& from, name validator, intx::uint256 donate_rate) {
+        auto target = evmc::from_hex<evmc::address>(stake_address);
+
+        auto txn = generate_tx(*target, 0, 500'000);
+        // claim2(address,uint256) = 0a61806e
+        txn.data = evmc::from_hex("0x0a61806e").value();
+        auto reserved_addr = silkworm::make_reserved_address(validator.to_uint64_t());
+
+        txn.data += evmc::from_hex(address_str32(reserved_addr)).value();      // param1 (to: address)
+        txn.data += evmc::from_hex(uint256_str32(donate_rate)).value();  // param2 (donate_rate: uint256)
 
         auto old_nonce = from.next_nonce;
         from.sign(txn);
@@ -833,6 +856,164 @@ try {
 
     
     claimSyncReward(evm1, "bob"_n);
+
+}
+FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(it_xsat_special_routine, it_tester)
+try {
+    
+    auto proxy = evmc::from_hex<evmc::address>(stake_address);
+
+    push_action(evmutil_account, "setxsatproxy"_n, evmutil_account, mvo()("proxy_address",fc::variant(proxy).as_string()));
+
+    produce_block();
+
+    push_action(endrmng_account,
+                "reset"_n,
+                endrmng_account,
+                mvo()("proxy",make_key(proxy->bytes, 20))("staker",make_key(evm1.address.bytes, 20))("validator","alice"_n)("test_xsat",true));
+    produce_block();
+
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(100'00000000, eos_token_symbol), evm1.address_0x().c_str());
+
+    produce_block();
+    auto token_addr = *evmc::from_hex<evmc::address>(xbtc_address);
+    
+    auto tx = generate_tx(token_addr, intx::exp(10_u256, intx::uint256(18))*2 ,10'0000);
+    evm1.sign(tx);
+    pushtx(tx);
+
+    produce_block();
+
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18))*2, std::string("balance: ") + intx::to_string(bal));
+
+
+    approve(evm1, intx::exp(10_u256, intx::uint256(18)));
+    produce_block();
+
+
+    auto fee = depFee();
+    produce_block();
+
+    assertstake(0);
+
+    stake(evm1, "alice"_n, intx::exp(10_u256, intx::uint256(18)), fee);
+    produce_block();
+
+    assertstake(1'00000000);
+    assertval("alice"_n);
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18)), std::string("balance: ") + intx::to_string(bal));
+
+    produce_block();
+
+    restake(evm1, "alice"_n, "bob"_n, intx::exp(10_u256, intx::uint256(18)));
+    produce_block();
+
+    BOOST_REQUIRE_EXCEPTION(
+        assertval("alice"_n),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("validator not correct"));
+
+    assertval("bob"_n);
+
+    withdraw(evm1,"bob"_n,  intx::exp(10_u256, intx::uint256(18)));
+    produce_block();
+
+    assertstake(0);
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18)), std::string("balance: ") + intx::to_string(bal));
+
+    produce_block();
+
+    claimPendingFunds(evm1, "bob"_n);
+    produce_block();
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18)), std::string("balance: ") + intx::to_string(bal));
+
+    push_action(evmutil_account, "setlocktime"_n, evmutil_account, mvo()("proxy_address",stake_address)("locktime",10));
+
+    produce_block();
+    claimPendingFunds(evm1, "bob"_n);
+    produce_block();
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18)), std::string("balance: ") + intx::to_string(bal));
+
+    for(int i =0; i < 20; ++ i) {
+        produce_block();
+    }
+
+    claimPendingFunds(evm1, "bob"_n);
+    produce_block();
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_MESSAGE(bal == intx::exp(10_u256, intx::uint256(18))*2, std::string("balance: ") + intx::to_string(bal));
+
+    BOOST_REQUIRE_EXCEPTION(
+        claim(evm1, "alice"_n),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("XSAT stake cannot call claim"));
+
+    BOOST_REQUIRE_EXCEPTION(
+        claim2(evm1, "alice"_n, 5000),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("XSAT stake cannot call claim"));
+
+
+}
+FC_LOG_AND_RETHROW()
+
+
+BOOST_FIXTURE_TEST_CASE(it_claim2, it_tester)
+try {
+    
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(100'00000000, eos_token_symbol), evm1.address_0x().c_str());
+
+    produce_block();
+    push_action(evmutil_account, "setlocktime"_n, evmutil_account, mvo()("proxy_address",stake_address)("locktime",0));
+    produce_block();
+    auto token_addr = *evmc::from_hex<evmc::address>(xbtc_address);
+    
+    auto tx = generate_tx(token_addr, intx::exp(10_u256, intx::uint256(18))*2 ,10'0000);
+    evm1.sign(tx);
+    pushtx(tx);
+
+    produce_block();
+
+
+    approve(evm1, intx::exp(10_u256, intx::uint256(18)));
+    produce_block();
+
+
+    auto fee = depFee();
+    produce_block();
+
+    stake(evm1, "alice"_n, intx::exp(10_u256, intx::uint256(18)), fee);
+    produce_block();
+
+    BOOST_REQUIRE_EXCEPTION(
+        claim2(evm1, "bob"_n, 5000),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("validator not found"));
+
+    BOOST_REQUIRE_EXCEPTION(
+        claim2(evm1, "alice"_n, 10001),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("donate rate must smaller than 10000"));
+
+    claim2(evm1, "alice"_n, 10000);
+    produce_block();
+
+    claim2(evm1, "alice"_n, 0);
+    produce_block();
 
 }
 FC_LOG_AND_RETHROW()
