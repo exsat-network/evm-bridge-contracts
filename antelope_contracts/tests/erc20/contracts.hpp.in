@@ -27,6 +27,9 @@ struct contracts {
     static std::vector<uint8_t> eosio_token_wasm() { return read_wasm("${ANTELOPE_CONTRACTS_SOURCE_DIR}/eosio.token/eosio.token.wasm"); }
     static std::vector<char> eosio_token_abi() { return read_abi("${ANTELOPE_CONTRACTS_SOURCE_DIR}/eosio.token/eosio.token.abi"); }
 
+    static std::vector<uint8_t> core_vaulta_wasm() { return read_wasm("${ANTELOPE_CONTRACTS_SOURCE_DIR}/core.vaulta/system.wasm"); }
+    static std::vector<char> core_vaulta_abi() { return read_abi("${ANTELOPE_CONTRACTS_SOURCE_DIR}/core.vaulta/system.abi"); }
+
     static std::vector<uint8_t> erc20_wasm() { return read_wasm("${ANTELOPE_CONTRACTS_BINARY_DIR}/erc20/erc20.wasm"); }
     static std::vector<char> erc20_abi() { return read_abi("${ANTELOPE_CONTRACTS_BINARY_DIR}/erc20/erc20.abi"); }
 
