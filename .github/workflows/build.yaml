@@ -113,7 +113,7 @@ jobs:
           fi
 
   build:
-    name: EOS EVM Bridge Contracts Build & Test
+    name: Vaulta EVM Bridge Contracts Build & Test
     needs: [d, build-platforms, versions]
     if: always() && needs.d.result == 'success' && (needs.build-platforms.result == 'success' ||  needs.build-platforms.result == 'skipped') && needs.versions.result == 'success'
     strategy:
@@ -157,17 +157,17 @@ jobs:
           apt install -y ./*.deb
           rm ./*.deb
 
-      - name: Download EOS EVM Contract
+      - name: Download Vaulta EVM Contract
         uses: AntelopeIO/asset-artifact-download-action@v3
         with:
-          owner: eosnetworkfoundation
+          owner: VaultaFoundation
           repo: evm-contract
           target: '${{needs.versions.outputs.evm-contract-target}}'
           prereleases: ${{fromJSON(needs.versions.outputs.evm-contract-prerelease)}}
           file: 'contract.tar.gz'
           artifact-name: contract.test-actions-off.tar.gz
 
-      - name: Extract EOS EVM Contract
+      - name: Extract Vaulta EVM Contract
         id: evm-contract
         run: |
           mkdir contract
