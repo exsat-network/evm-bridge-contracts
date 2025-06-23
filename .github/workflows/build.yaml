@@ -18,12 +18,12 @@ on:
         - default
         - true
         - false
-      override-eos-evm-contract:
-        description: 'Override eos-evm-contract target'
+      override-evm-contract:
+        description: 'Override evm-contract target'
         type: string
-      override-eos-evm-contract-prerelease:
+      override-evm-contract-prerelease:
         type: choice
-        description: Override eos-evm-contract prelease
+        description: Override evm-contract prelease
         options:
         - default
         - true
@@ -83,8 +83,8 @@ jobs:
       antelope-spring-dev-prerelease: ${{steps.versions.outputs.antelope-spring-dev-prerelease}}
       cdt-target: ${{steps.versions.outputs.cdt-target}}
       cdt-prerelease: ${{steps.versions.outputs.cdt-prerelease}}
-      eos-evm-contract-target: ${{steps.versions.outputs.eos-evm-contract-target}}
-      eos-evm-contract-prerelease: ${{steps.versions.outputs.eos-evm-contract-prerelease}}
+      evm-contract-target: ${{steps.versions.outputs.evm-contract-target}}
+      evm-contract-prerelease: ${{steps.versions.outputs.evm-contract-prerelease}}
     steps:
       - name: Setup versions from input or defaults
         id: versions
@@ -96,8 +96,8 @@ jobs:
           echo antelope-spring-dev-prerelease=$(echo "$DEFAULTS_JSON" | jq -r '."antelope-spring-dev".prerelease') >> $GITHUB_OUTPUT
           echo cdt-target=$(echo "$DEFAULTS_JSON" | jq -r '."cdt".target') >> $GITHUB_OUTPUT
           echo cdt-prerelease=$(echo "$DEFAULTS_JSON" | jq -r '."cdt".prerelease') >> $GITHUB_OUTPUT
-          echo eos-evm-contract-target=$(echo "$DEFAULTS_JSON" | jq -r '."eos-evm-contract".target') >> $GITHUB_OUTPUT
-          echo eos-evm-contract-prerelease=$(echo "$DEFAULTS_JSON" | jq -r '."eos-evm-contract".prerelease') >> $GITHUB_OUTPUT
+          echo evm-contract-target=$(echo "$DEFAULTS_JSON" | jq -r '."evm-contract".target') >> $GITHUB_OUTPUT
+          echo evm-contract-prerelease=$(echo "$DEFAULTS_JSON" | jq -r '."evm-contract".prerelease') >> $GITHUB_OUTPUT
 
           if [[ "${{inputs.override-cdt}}" != "" ]]; then
             echo cdt-target=${{inputs.override-cdt}} >> $GITHUB_OUTPUT
@@ -105,11 +105,11 @@ jobs:
           if [[ "${{inputs.override-cdt-prerelease}}" == +(true|false) ]]; then
             echo cdt-prerelease=${{inputs.override-cdt-prerelease}} >> $GITHUB_OUTPUT
           fi
-          if [[ "${{inputs.override-eos-evm-contract}}" != "" ]]; then
-            echo eos-evm-contract-target=${{inputs.override-eos-evm-contract}} >> $GITHUB_OUTPUT
+          if [[ "${{inputs.override-evm-contract}}" != "" ]]; then
+            echo evm-contract-target=${{inputs.override-evm-contract}} >> $GITHUB_OUTPUT
           fi
-          if [[ "${{inputs.override-eos-evm-contract-prerelease}}" == +(true|false) ]]; then
-            echo eos-evm-contract-prerelease=${{inputs.override-eos-evm-contract-prerelease}} >> $GITHUB_OUTPUT
+          if [[ "${{inputs.override-evm-contract-prerelease}}" == +(true|false) ]]; then
+            echo evm-contract-prerelease=${{inputs.override-evm-contract-prerelease}} >> $GITHUB_OUTPUT
           fi
 
   build:
@@ -161,9 +161,9 @@ jobs:
         uses: AntelopeIO/asset-artifact-download-action@v3
         with:
           owner: eosnetworkfoundation
-          repo: eos-evm
-          target: '${{needs.versions.outputs.eos-evm-contract-target}}'
-          prereleases: ${{fromJSON(needs.versions.outputs.eos-evm-contract-prerelease)}}
+          repo: evm-contract
+          target: '${{needs.versions.outputs.evm-contract-target}}'
+          prereleases: ${{fromJSON(needs.versions.outputs.evm-contract-prerelease)}}
           file: 'contract.tar.gz'
           artifact-name: contract.test-actions-off.tar.gz
 
