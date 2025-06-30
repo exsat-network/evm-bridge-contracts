@@ -304,7 +304,13 @@ transaction_trace_ptr erc20_tester::bridgereg(eosio::chain::name receiver, eosio
 void erc20_tester::open(name owner) { push_action(evm_account, "open"_n, owner, mvo()("owner", owner)); }
 
 transaction_trace_ptr erc20_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
-    auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
+    fc::datastream<size_t> ps;
+    fc::raw::pack(ps, input);
+    fc::raw::pack(ps, callback);
+    std::vector<char> binary_data(ps.tellp());
+    fc::datastream<char *> ds(binary_data.data(), size_t(binary_data.size()));
+    fc::raw::pack(ds, input);
+    fc::raw::pack(ds, callback);
     return erc20_tester::push_action(evm_account, "exec"_n, evm_account, bytes{binary_data.begin(), binary_data.end()}, DEFAULT_EXPIRATION_DELTA + (exec_count++) % 3500);
 }
 

@@ -1116,6 +1116,53 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(it_proxy_tokenswap, it_tester)
+try {
+    evm_eoa evm1;
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(1000000, eos_token_symbol), evm1.address_0x().c_str());
+    produce_block();
+
+
+    // USDT balance should be zero
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 0);
+    produce_block();
+
+    transfer_token(token_account, "alice"_n, evmin_account, make_asset(10000, token_symbol), evm1.address_0x().c_str());
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 990000); // +1000000 - 10000
+    BOOST_REQUIRE(99990000 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // -10000
+    auto tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(9900, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(100, token_symbol));
+    produce_block();
+
+    swapgastoken(); // swap EOS to A
+
+    // USDT transfer not affected
+    transfer_token(token_account, "alice"_n, evmin_account, make_asset(101, token_symbol), evm1.address_0x().c_str());
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 990100); // 9900000 + (10100 - 10000)
+    BOOST_REQUIRE(99989899 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // 99990000 - 101
+    tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(9901, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(200, token_symbol));
+    produce_block();
+
+    // eos gas token transfer to proxy account will fail
+    BOOST_REQUIRE_EXCEPTION(transfer_token(eos_token_account, "alice"_n, evmin_account, make_asset(100, eos_token_symbol), evm1.address_0x().c_str()),
+    eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
+
+    // alice: swap my gas token
+    transfer_token(eos_token_account, "alice"_n, core_vaulta_account, make_asset(123, eos_token_symbol), evm1.address_0x().c_str());
+
+    // new gas token transfer to proxy account will succeed
+    transfer_token(core_vaulta_account, "alice"_n, evmin_account, make_asset(123, core_vaulta_symbol), evm1.address_0x().c_str());
+}
+FC_LOG_AND_RETHROW()
+
+
 BOOST_FIXTURE_TEST_CASE(it_evm2native_bridge, it_tester)
 try {
     auto str_to_bytes = [](const char pri_key[65]) -> std::basic_string<uint8_t> {
