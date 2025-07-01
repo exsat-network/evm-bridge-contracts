@@ -91,8 +91,10 @@ struct it_tester : erc20_tester {
         return ss.str();
     }
 
+    const eosio::chain::symbol eos_token_symbol = eosio::chain::symbol(4u, "EOS");
+    
     std::string evm_address; // <- the ERC20-contract address in EVM side
-    it_tester() : erc20_tester(true) {
+    it_tester() : erc20_tester(true, "eosio.evm"_n, "4,EOS", "eosio.token"_n) {
         create_accounts({"alice"_n});
         transfer_token(eos_token_account, faucet_account_name, "alice"_n, make_asset(10000'0000));
         produce_block();
@@ -282,6 +284,16 @@ struct it_tester : erc20_tester {
         call(caller, target_bytes, silkworm::Bytes(v), data, 500000, caller);
     }
 
+    void swapgastoken() try {
+
+        // swap to A token
+        push_action(evm_account, "swapgastoken"_n, evm_account, mvo()("new_token_contract", core_vaulta_account)("new_symbol",core_vaulta_symbol)("swap_dest_account", "")("swap_memo", ""));
+
+        // call erc2o::init again
+        push_action(erc20_account, "init"_n, erc20_account, mvo()("evm_account", evm_account)("gas_token_symbol", core_vaulta_symbol)("gaslimit", 500000)("init_gaslimit", 10000000));
+                
+    } FC_LOG_AND_RETHROW()
+
 };
 
 BOOST_AUTO_TEST_SUITE(erc20_tests)
@@ -330,6 +342,59 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(it_basic_transfer_tokenswap, it_tester)
+try {
+    evm_eoa evm1;
+    auto addr_alice = silkworm::make_reserved_address("alice"_n.to_uint64_t());
+
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(1000000, eos_token_symbol), evm1.address_0x().c_str());
+    produce_block();
+
+
+    // USDT balance should be zero
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_EQUAL(bal, 0);
+
+    produce_block();
+
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(5000, token_symbol), evm1.address_0x().c_str());
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_EQUAL(bal, 490000);
+    BOOST_REQUIRE_EQUAL(99995000, get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+
+    swapgastoken(); // swap EOS to A
+
+    produce_block();
+
+    // USDT: native->EVM not affected
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(5001, token_symbol), evm1.address_0x().c_str());
+
+    BOOST_REQUIRE_EQUAL(99989999, get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+
+    auto tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE_EQUAL(tokenInfo.balance, make_asset(9801, token_symbol));
+    BOOST_REQUIRE_EQUAL(tokenInfo.fee_balance, make_asset(200, token_symbol));
+
+    produce_block();
+
+    auto fee = egressFee();
+    // received = 1000/1e6*1e4 = 10
+    bridgeTransferERC20(evm1, addr_alice, 1000, "aaa", fee);
+    produce_block();
+
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE_EQUAL(bal, 979100);
+
+    bal = balanceOf(address_str_0x(addr_alice).c_str());
+    BOOST_REQUIRE_EQUAL(bal, 0);
+
+    bal = get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount();
+
+    BOOST_REQUIRE_EQUAL(99990009, get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+}
+FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE(it_regular_transfer, it_tester)
 try {
@@ -523,6 +588,95 @@ try {
 
     // alice has 9997.0000 USDT
     BOOST_REQUIRE(9997'0100 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+}
+FC_LOG_AND_RETHROW()
+
+
+BOOST_FIXTURE_TEST_CASE(it_regtoken_setegressfee_tokenswap, it_tester)
+try {
+    constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(18 - 4));
+    evm_eoa evm1;
+    auto addr_alice = silkworm::make_reserved_address("alice"_n.to_uint64_t());
+
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(1000000, eos_token_symbol), evm1.address_0x().c_str());
+    produce_block();
+
+    // USDT balance should be zero
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 0);
+
+    produce_block();
+
+    // alice send 1.0000 USDT to evm1
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(10000, token_symbol), evm1.address_0x().c_str());
+
+    // evm1 has 0.990000 USDT
+    BOOST_REQUIRE(balanceOf(evm1.address_0x().c_str()) == 990000);
+
+    // alice has 9999.0000 USDT
+    BOOST_REQUIRE(9999'0000 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+
+    swapgastoken();
+
+    // unregtoken
+    push_action(
+        erc20_account, "unregtoken"_n, erc20_account, mvo()("eos_contract_name", token_account)("token_symbol_code", (std::string)(token_symbol.name())));
+
+    intx::uint256 fee = egressFee();
+
+    // register token with old gas token symbol will fail
+    BOOST_REQUIRE_EXCEPTION(
+        push_action(erc20_account, "regtoken"_n, erc20_account, mvo()("eos_contract_name",token_account.to_string())("evm_token_name","EVM USDT V2")("evm_token_symbol","WUSDT")("ingress_fee","0.0100 USDT")("egress_fee","0.0100 EOS")("erc20_precision",6)),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("egress_fee should have gas token symbol"));
+
+    // register token again with correct gas token symbol
+    push_action(erc20_account, "regtoken"_n, erc20_account, mvo()("eos_contract_name",token_account.to_string())("evm_token_name","EVM USDT V2")("evm_token_symbol","WUSDT")("ingress_fee","0.0100 USDT")("egress_fee",make_asset(100, core_vaulta_symbol))("erc20_precision",6));
+
+    // EOS->EVM: alice transfer 2 USDT to evm1 in EVM (new ERC-EVM address)
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(20000, token_symbol), evm1.address_0x().c_str());
+
+    // alice has 9997.0000 USDT
+    BOOST_REQUIRE(9997'0000 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+
+    // evm1 has 0.990000 USDT under the original ERC-20 address
+    BOOST_REQUIRE(balanceOf(evm1.address_0x().c_str()) == 990000);
+
+    // refresh evm token address
+    evm_address = getSolidityContractAddress();
+
+    // evm1 has 1.990000 USDT under the new ERC-20 address
+    BOOST_REQUIRE(balanceOf(evm1.address_0x().c_str()) == 1990000);
+
+    // EVM->EOS: evm1 tranfer 0.010000 USDT to alice
+    bridgeTransferERC20(evm1, addr_alice, 10000, "aaa", fee);
+
+    // evm1 has 1.980000 USDT under the new ERC-20 address
+    BOOST_REQUIRE(balanceOf(evm1.address_0x().c_str()) == 1980000);    
+
+    // alice has 9997.0000 USDT
+    BOOST_REQUIRE(9997'0100 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+
+    BOOST_REQUIRE_EXCEPTION(
+        push_action(erc20_account, "setegressfee"_n, erc20_account, 
+        mvo()("token_contract", token_account)("token_symbol_code", "USDT")("egress_fee", make_asset(5000))),
+        eosio_assert_message_exception, 
+        eosio_assert_message_is("egress_fee should have gas token symbol"));
+    
+    push_action(erc20_account, "setegressfee"_n, erc20_account, 
+        mvo()("token_contract", token_account)("token_symbol_code", "USDT")("egress_fee", make_asset(5000, core_vaulta_symbol)));
+
+    BOOST_REQUIRE_EQUAL(5000 * minimum_natively_representable, egressFee());
+
+    // using old fee, evm trx will fail (but still be recorded on chain)
+    bridgeTransferERC20(evm1, addr_alice, 10000, "aab", fee);
+    BOOST_REQUIRE_EQUAL(balanceOf(evm1.address_0x().c_str()), 1980000); 
+
+    // using new fee
+    fee = egressFee();
+    bridgeTransferERC20(evm1, addr_alice, 10000, "aac", fee);
+    BOOST_REQUIRE_EQUAL(balanceOf(evm1.address_0x().c_str()), 1970000); 
 }
 FC_LOG_AND_RETHROW()
 
@@ -961,6 +1115,53 @@ try {
 
 }
 FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(it_proxy_tokenswap, it_tester)
+try {
+    evm_eoa evm1;
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(1000000, eos_token_symbol), evm1.address_0x().c_str());
+    produce_block();
+
+
+    // USDT balance should be zero
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 0);
+    produce_block();
+
+    transfer_token(token_account, "alice"_n, evmin_account, make_asset(10000, token_symbol), evm1.address_0x().c_str());
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 990000); // +1000000 - 10000
+    BOOST_REQUIRE(99990000 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // -10000
+    auto tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(9900, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(100, token_symbol));
+    produce_block();
+
+    swapgastoken(); // swap EOS to A
+
+    // USDT transfer not affected
+    transfer_token(token_account, "alice"_n, evmin_account, make_asset(101, token_symbol), evm1.address_0x().c_str());
+    bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 990100); // 9900000 + (10100 - 10000)
+    BOOST_REQUIRE(99989899 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // 99990000 - 101
+    tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(9901, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(200, token_symbol));
+    produce_block();
+
+    // eos gas token transfer to proxy account will fail
+    BOOST_REQUIRE_EXCEPTION(transfer_token(eos_token_account, "alice"_n, evmin_account, make_asset(100, eos_token_symbol), evm1.address_0x().c_str()),
+    eosio_assert_message_exception, eosio_assert_message_is("received unexpected token"));
+
+    // alice: swap my gas token
+    transfer_token(eos_token_account, "alice"_n, core_vaulta_account, make_asset(123, eos_token_symbol), evm1.address_0x().c_str());
+
+    // new gas token transfer to proxy account will succeed
+    transfer_token(core_vaulta_account, "alice"_n, evmin_account, make_asset(123, core_vaulta_symbol), evm1.address_0x().c_str());
+}
+FC_LOG_AND_RETHROW()
+
 
 BOOST_FIXTURE_TEST_CASE(it_evm2native_bridge, it_tester)
 try {

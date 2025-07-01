@@ -17,9 +17,10 @@ void deposit_proxy::transfer(eosio::name from, eosio::name to, eosio::asset quan
    eosio::check(memo_has_evm_address, "memo must be a valid EVM address");
 
    constexpr extended_symbol EOS  = eosio::extended_symbol{eosio::symbol{"EOS",4}, "eosio.token"_n};
+   constexpr extended_symbol A = eosio::extended_symbol{eosio::symbol{"A",4}, "core.vaulta"_n};
    const auto s = eosio::extended_symbol{quantity.symbol, get_first_receiver()};
 
-   auto destination = s == EOS ? "eosio.evm"_n : "eosio.erc2o"_n;
+   auto destination = (s == EOS || s == A)? "eosio.evm"_n : "eosio.erc2o"_n;
    action(std::vector<permission_level>{{get_self(), "active"_n}}, s.get_contract(), "transfer"_n,
       std::make_tuple(get_self(), destination, quantity, memo)
    ).send();

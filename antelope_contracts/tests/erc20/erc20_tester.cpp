@@ -41,13 +41,9 @@ void to_variant(const evmc::address& o, fc::variant& v)
 
 
 namespace erc20_test {
-const eosio::chain::symbol token_symbol(4u, "USDT");
-const eosio::chain::symbol eos_token_symbol(4u, "EOS");
-const eosio::chain::name gold_token_account("goldgoldgold"); // testing evm->native bridge
-const eosio::chain::name evm_account("eosio.evm");
-const eosio::chain::name faucet_account_name("eosio.faucet");
-const eosio::chain::name erc20_account("eosio.erc2o");
-const eosio::chain::name evmin_account("eosio.evmin");
+
+    const eosio::chain::symbol erc20_tester::token_symbol = eosio::chain::symbol(4u, "USDT");
+    const eosio::chain::symbol erc20_tester::core_vaulta_symbol = eosio::chain::symbol(4u, "A");
 
 evm_eoa::evm_eoa(std::basic_string<uint8_t> optional_private_key)
 {
@@ -135,8 +131,18 @@ erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, s
 
     produce_block();
 
-    create_accounts({eos_token_account, evm_account, token_account, faucet_account_name, erc20_account, gold_token_account});
+    create_accounts({core_vaulta_account, eos_token_account, evm_account, token_account, faucet_account_name, erc20_account, gold_token_account_name});
     create_account(evmin_account, config::system_account_name, false, true);
+
+    // core.vaulta
+    set_code(core_vaulta_account, testing::contracts::core_vaulta_wasm());
+    set_abi(core_vaulta_account, testing::contracts::core_vaulta_abi().data());    
+    push_action(core_vaulta_account, 
+                "init"_n, 
+                core_vaulta_account,
+                mvo()("maximum_supply", asset(10'000'000'000'0000, core_vaulta_symbol)));
+
+    produce_block();
 
     // eosio.token
     set_code(eos_token_account, testing::contracts::eosio_token_wasm());
@@ -166,16 +172,16 @@ erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, s
                 mvo()("to", faucet_account_name)("quantity", asset(1'000'000'000'0000, symbol::from_string("4,USDT")))("memo", ""));
 
     // create and issue mirrored GOLD token to erc2o account
-    set_code(gold_token_account, testing::contracts::eosio_token_wasm());
-    set_abi(gold_token_account, testing::contracts::eosio_token_abi().data());
+    set_code(gold_token_account_name, testing::contracts::eosio_token_wasm());
+    set_abi(gold_token_account_name, testing::contracts::eosio_token_abi().data());
 
-    push_action(gold_token_account,
+    push_action(gold_token_account_name,
                 "create"_n,
-                gold_token_account,
-                mvo()("issuer", gold_token_account)("maximum_supply", asset(100'000'000'0000, symbol::from_string("4,GOLD"))));
-    push_action(gold_token_account,
+                gold_token_account_name,
+                mvo()("issuer", gold_token_account_name)("maximum_supply", asset(100'000'000'0000, symbol::from_string("4,GOLD"))));
+    push_action(gold_token_account_name,
                 "issue"_n,
-                gold_token_account,
+                gold_token_account_name,
                 mvo()("to", erc20_account)("quantity", asset(100'000'000'0000, symbol::from_string("4,GOLD")))("memo", erc20_account.to_string()));
 
 
@@ -190,11 +196,6 @@ erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, s
     
     if (native_symbol_str.length()) {
         push_action(erc20_account, "init"_n, erc20_account, mvo("evm_account", evm_account)("gas_token_symbol", native_symbol_str)("gaslimit", 500000)("init_gaslimit", 10000000));
-
-        BOOST_REQUIRE_EXCEPTION(
-            push_action(erc20_account, "init"_n, erc20_account, mvo("evm_account", evm_account)("gas_token_symbol", native_symbol_str)("gaslimit", 1)("init_gaslimit", 1)),
-            eosio_assert_message_exception, 
-            testing::eosio_assert_message_is("erc20 config already initialized"));
     }
 
     if (use_real_evm) {
@@ -303,7 +304,13 @@ transaction_trace_ptr erc20_tester::bridgereg(eosio::chain::name receiver, eosio
 void erc20_tester::open(name owner) { push_action(evm_account, "open"_n, owner, mvo()("owner", owner)); }
 
 transaction_trace_ptr erc20_tester::exec(const exec_input& input, const std::optional<exec_callback>& callback) {
-    auto binary_data = fc::raw::pack<exec_input, std::optional<exec_callback>>(input, callback);
+    fc::datastream<size_t> ps;
+    fc::raw::pack(ps, input);
+    fc::raw::pack(ps, callback);
+    std::vector<char> binary_data(ps.tellp());
+    fc::datastream<char *> ds(binary_data.data(), size_t(binary_data.size()));
+    fc::raw::pack(ds, input);
+    fc::raw::pack(ds, callback);
     return erc20_tester::push_action(evm_account, "exec"_n, evm_account, bytes{binary_data.begin(), binary_data.end()}, DEFAULT_EXPIRATION_DELTA + (exec_count++) % 3500);
 }
 

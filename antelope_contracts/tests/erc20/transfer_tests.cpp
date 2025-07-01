@@ -23,7 +23,7 @@ using intx::operator""_u256;
 constexpr size_t kAddressLength{20};
 
 struct transfer_tester : erc20_tester {
-    transfer_tester() {
+    transfer_tester(): erc20_tester(false, "eosio.evm"_n, "4,EOS", "eosio.token"_n) {
         create_accounts({"alice"_n});
         transfer_token(eos_token_account, faucet_account_name, "alice"_n, make_asset(10000'0000));
         create_accounts({"bob"_n});

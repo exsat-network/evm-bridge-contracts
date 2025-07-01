@@ -145,8 +145,8 @@ class [[eosio::contract]] erc20 : public contract {
     struct [[eosio::table("config")]] config_t {
         uint64_t      evm_gaslimit = default_evm_gaslimit;
         uint64_t      evm_init_gaslimit = default_evm_init_gaslimit;
-        eosio::name   evm_account = default_evm_account;
-        eosio::symbol evm_gas_token_symbol = default_native_token_symbol;
+        eosio::name   evm_account;
+        eosio::symbol evm_gas_token_symbol;
 
         EOSLIB_SERIALIZE(config_t, (evm_gaslimit)(evm_init_gaslimit)(evm_account)(evm_gas_token_symbol));
     };
