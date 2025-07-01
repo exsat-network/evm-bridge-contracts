@@ -8,7 +8,7 @@
        "prerelease":false
     },
     "evm-contract":{
-      "target":"kayan_tokenswap",
+      "target":"main",
       "prerelease":false
     }
  }
