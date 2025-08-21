@@ -127,7 +127,7 @@ erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, s
     set_code("eosio"_n, testing::contracts::eosio_boot_wasm());
     set_abi("eosio"_n, testing::contracts::eosio_boot_abi().data());
 
-    preactivate_all_builtin_protocol_features();
+    activate_all_builtin_protocol_features();
 
     produce_block();
 
