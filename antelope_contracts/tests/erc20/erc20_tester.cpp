@@ -108,7 +108,17 @@ void evm_eoa::sign(silkworm::Transaction& trx, std::optional<uint64_t> evm_chain
 evm_eoa::~evm_eoa() { secp256k1_context_destroy(ctx); }
 
 
-
+namespace {
+    // for compatibility of different spring versions
+    template <typename Tester> 
+    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(c.preactivate_all_builtin_protocol_features()), int> _) {
+       c.preactivate_all_builtin_protocol_features();
+    }
+    template <typename Tester> 
+    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(c.activate_all_builtin_protocol_features()), int> _) {
+       c.activate_all_builtin_protocol_features();
+    }
+}
 
 erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, std::string native_symbol_str, eosio::chain::name eos_token_account_) : evm_account(evm_account_), native_symbol(symbol::from_string(native_symbol_str)), eos_token_account(eos_token_account_) {
     auto def_conf = default_config(tempdir, 65536);
@@ -127,7 +137,7 @@ erc20_tester::erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, s
     set_code("eosio"_n, testing::contracts::eosio_boot_wasm());
     set_abi("eosio"_n, testing::contracts::eosio_boot_abi().data());
 
-    activate_all_builtin_protocol_features();
+    activate_all_protocol_features(*this, 0);
 
     produce_block();
 
