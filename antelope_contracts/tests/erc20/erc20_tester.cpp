@@ -111,11 +111,11 @@ evm_eoa::~evm_eoa() { secp256k1_context_destroy(ctx); }
 namespace {
     // for compatibility of different spring versions
     template <typename Tester> 
-    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(c.preactivate_all_builtin_protocol_features()), int> _) {
+    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(&Tester::preactivate_all_builtin_protocol_features), int> _) {
        c.preactivate_all_builtin_protocol_features();
     }
     template <typename Tester> 
-    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(c.activate_all_builtin_protocol_features()), int> _) {
+    inline void activate_all_protocol_features(Tester &c, std::enable_if_t<sizeof(&Tester::activate_all_builtin_protocol_features), int> _) {
        c.activate_all_builtin_protocol_features();
     }
 }
