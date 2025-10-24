@@ -99,8 +99,6 @@ FC_REFLECT(erc20_test::token_t, (id)(token_contract)(address)(ingress_fee)(balan
 FC_REFLECT(erc20_test::evm_contract_account_t, (id)(eth_address)(nonce)(balance)(code_id))
 
 namespace erc20_test {
-extern const eosio::chain::symbol eos_token_symbol;
-extern const eosio::chain::symbol token_symbol;
 
 class evm_eoa
 {
@@ -143,16 +141,24 @@ class erc20_tester : public eosio::testing::base_tester {
    public:
    using testing::base_tester::push_action;
 
+   // native token
    static constexpr eosio::chain::name token_account = "tethertether"_n;
+   static const eosio::chain::symbol token_symbol; // 4,USDT
+
+   // evm erc-20 token
    static constexpr eosio::chain::name gold_token_account_name = "goldgoldgold"_n; // testing evm->native bridge
    static constexpr eosio::chain::name faucet_account_name = "eosio.faucet"_n;
    static constexpr eosio::chain::name erc20_account = "eosio.erc2o"_n;
    static constexpr eosio::chain::name eos_system_account = "eosio"_n;
+   static constexpr eosio::chain::name evmin_account = "eosio.evmin"_n;
+   static constexpr eosio::chain::name core_vaulta_account = "core.vaulta"_n;
+   static const eosio::chain::symbol core_vaulta_symbol;
+
    const eosio::chain::name eos_token_account;
 
     const eosio::chain::name evm_account;
     const eosio::chain::symbol native_symbol;
-    explicit erc20_tester(bool use_real_evm = false, eosio::chain::name evm_account_ = "eosio.evm"_n, std::string native_symbol_str = "4,EOS", eosio::chain::name eos_token_account_ = "eosio.token"_n);
+    explicit erc20_tester(bool use_real_evm, eosio::chain::name evm_account_, std::string native_symbol_str, eosio::chain::name eos_token_account_);
 
     unsigned int exec_count = 0; // ensure uniqueness in exec
 
@@ -180,6 +186,8 @@ class erc20_tester : public eosio::testing::base_tester {
     silkworm::Transaction
     prepare_deploy_contract_tx(const unsigned char* contract, size_t size, uint64_t gas_limit) const;
     transaction_trace_ptr pushtx(const silkworm::Transaction& trx, name miner = {});
+    transaction_trace_ptr call(name from, const evmc::bytes& to, const evmc::bytes& value, evmc::bytes& data, uint64_t gas_limit, name actor);
+
 
     eosio::chain::abi_serializer abi_ser;
     eosio::chain::abi_serializer token_abi_ser;

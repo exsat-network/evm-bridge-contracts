@@ -622,13 +622,9 @@ void erc20::init(eosio::name evm_account, eosio::symbol gas_token_symbol, uint64
     require_auth(get_self());
 
     config_singleton_t config_table(get_self(), get_self().value);
-    eosio::check(!config_table.exists(), "erc20 config already initialized");
 
     config_t config;
     token_table_t token_table(_self, _self.value);
-    if (token_table.begin() != token_table.end()) {
-        eosio::check(evm_account == default_evm_account && gas_token_symbol == default_native_token_symbol, "can only init with native EOS symbol");
-    }
     config.evm_account = evm_account;
     config.evm_gas_token_symbol = gas_token_symbol;
     config.evm_gaslimit = gaslimit;
