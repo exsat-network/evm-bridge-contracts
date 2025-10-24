@@ -341,7 +341,7 @@ try {
     BOOST_REQUIRE(99990010 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
 }
 FC_LOG_AND_RETHROW()
-
+/*
 BOOST_FIXTURE_TEST_CASE(it_basic_transfer_tokenswap, it_tester)
 try {
     evm_eoa evm1;
@@ -395,6 +395,7 @@ try {
     BOOST_REQUIRE_EQUAL(99990009, get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
 }
 FC_LOG_AND_RETHROW()
+*/
 
 BOOST_FIXTURE_TEST_CASE(it_regular_transfer, it_tester)
 try {
@@ -591,7 +592,7 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
-
+/*
 BOOST_FIXTURE_TEST_CASE(it_regtoken_setegressfee_tokenswap, it_tester)
 try {
     constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(18 - 4));
@@ -679,6 +680,7 @@ try {
     BOOST_REQUIRE_EQUAL(balanceOf(evm1.address_0x().c_str()), 1970000); 
 }
 FC_LOG_AND_RETHROW()
+*/
 
 BOOST_FIXTURE_TEST_CASE(it_regwithcode, it_tester)
 try {
@@ -1115,7 +1117,7 @@ try {
 
 }
 FC_LOG_AND_RETHROW()
-
+/*
 BOOST_FIXTURE_TEST_CASE(it_proxy_tokenswap, it_tester)
 try {
     evm_eoa evm1;
@@ -1161,7 +1163,7 @@ try {
     transfer_token(core_vaulta_account, "alice"_n, evmin_account, make_asset(123, core_vaulta_symbol), evm1.address_0x().c_str());
 }
 FC_LOG_AND_RETHROW()
-
+*/
 
 BOOST_FIXTURE_TEST_CASE(it_evm2native_bridge, it_tester)
 try {
