@@ -7,7 +7,7 @@
        "target":"4",
        "prerelease":false
     },
-    "eos-evm-contract":{
+    "evm-contract":{
       "target":"main",
       "prerelease":false
     }
