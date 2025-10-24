@@ -953,6 +953,20 @@ try {
     BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(300, token_symbol));
     produce_block();
 
+    // No fee when transfer to one's own reserved address.
+    auto addr_alice = silkworm::make_reserved_address("alice"_n.to_uint64_t());
+
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(10000000, token_symbol), address_str_0x(addr_alice).c_str());
+    bal = balanceOf(address_str_0x(addr_alice).c_str());
+    dlog("bal=${a}", ("a",bal));
+    BOOST_REQUIRE(bal == 1000000000); // +1000000000
+    BOOST_REQUIRE(69999700 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // 
+    BOOST_REQUIRE(30000300 == get_balance(erc20_account, token_account, symbol::from_string("4,USDT")).get_amount()); 
+    tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(30000000, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(300, token_symbol));
+    produce_block();
+
     // Change fee and try transfer again.
     push_action(erc20_account, "setingressfee"_n, erc20_account, 
         mvo()("token_contract", token_account)("ingress_fee", make_asset(0, token_symbol)));
@@ -960,10 +974,10 @@ try {
     transfer_token(token_account, "alice"_n, erc20_account, make_asset(10000000, token_symbol), evm1.address_0x().c_str());
     bal = balanceOf(evm1.address_0x().c_str());
     BOOST_REQUIRE(bal == 3000000000); // +1000000000
-    BOOST_REQUIRE(69999700 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // 
-    BOOST_REQUIRE(30000300 == get_balance(erc20_account, token_account, symbol::from_string("4,USDT")).get_amount()); 
+    BOOST_REQUIRE(59999700 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount()); // 
+    BOOST_REQUIRE(40000300 == get_balance(erc20_account, token_account, symbol::from_string("4,USDT")).get_amount()); 
     tokenInfo = getRegistedTokenInfo();
-    BOOST_REQUIRE(tokenInfo.balance == make_asset(30000000, token_symbol));
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(40000000, token_symbol));
     BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(300, token_symbol));
     produce_block();
 

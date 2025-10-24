@@ -462,9 +462,26 @@ void erc20::transfer(eosio::name from, eosio::name to, eosio::asset quantity,
     auto itr = index.find(token_symbol_key(get_first_receiver(), quantity.symbol.code()));
 
     eosio::check(itr != index.end() && itr->ingress_fee.symbol == quantity.symbol, "received unregistered token");
-    eosio::check(quantity.amount > itr->ingress_fee.amount, "deposit amount must be greater than ingress fee");
 
-    quantity -= itr->ingress_fee;
+    bool waive_fee = false;
+
+    if (memo.size() == 42 && memo[0] == '0' && memo[1] == 'x') {
+        auto address_bytes = from_hex(memo);
+        if (!!address_bytes && address_bytes->size() == kAddressLength) {
+            auto reserved_addr = silkworm::make_reserved_address(from.value);
+            // the underlying ds of address_bytes is vector<char> and the ds of reserved_addr is uint8_t[]
+            if (std::equal((uint8_t*)address_bytes->data(), ((uint8_t*)address_bytes->data()) + kAddressLength, 
+                    static_cast<evmc::bytes_view>(reserved_addr.bytes).begin())) {
+                waive_fee = true;
+            }
+        }
+    }
+
+    if (!waive_fee) {
+        eosio::check(quantity.amount > itr->ingress_fee.amount, "deposit amount must be greater than ingress fee");
+        quantity -= itr->ingress_fee;
+    }
+
     eosio::check(quantity.amount > 0 && quantity.amount < (1ll<<62)-1, "deposit amount overflow");
 
     if (memo.size() == 42 && memo[0] == '0' && memo[1] == 'x') {
@@ -473,7 +490,9 @@ void erc20::transfer(eosio::name from, eosio::name to, eosio::asset quantity,
             if (v.is_evm_to_native() == false) {
                 v.balance += quantity;
             }
-            v.fee_balance += v.ingress_fee; 
+            if (!waive_fee) {
+                v.fee_balance += v.ingress_fee; 
+            }
         });
     } else
         eosio::check(false, "memo must be 0x EVM address");
