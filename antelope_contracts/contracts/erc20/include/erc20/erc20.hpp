@@ -66,6 +66,9 @@ class [[eosio::contract]] erc20 : public contract {
 
     [[eosio::action]] void addegress(const std::vector<name> &accounts);
     [[eosio::action]] void removeegress(const std::vector<name> &accounts);
+    [[eosio::action]] void addwaive(const std::vector<name> &accounts);
+    [[eosio::action]] void removewaive(const std::vector<name> &accounts);
+
     [[eosio::action]] void setegressfee(eosio::name token_contract, eosio::symbol_code token_symbol_code, const eosio::asset &egress_fee);
     [[eosio::action]] void setingressfee(eosio::name token_contract, eosio::asset ingress_fee);
     [[eosio::action]] void withdrawfee(eosio::name token_contract, eosio::asset quantity, eosio::name to, std::string memo);
@@ -141,6 +144,14 @@ class [[eosio::contract]] erc20 : public contract {
         EOSLIB_SERIALIZE(allowed_egress_account, (account));
     };
     typedef eosio::multi_index<"egresslist"_n, allowed_egress_account> egresslist_table_t;
+
+    struct [[eosio::table("waivelist")]] waive_fee_account {
+        eosio::name account;
+
+        uint64_t primary_key() const { return account.value; }
+        EOSLIB_SERIALIZE(waive_fee_account, (account));
+    };
+    typedef eosio::multi_index<"waivelist"_n, waive_fee_account> waivelist_table_t;
 
     struct [[eosio::table("config")]] config_t {
         uint64_t      evm_gaslimit = default_evm_gaslimit;

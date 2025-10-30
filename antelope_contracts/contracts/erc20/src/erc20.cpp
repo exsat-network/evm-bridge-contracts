@@ -465,7 +465,12 @@ void erc20::transfer(eosio::name from, eosio::name to, eosio::asset quantity,
 
     bool waive_fee = false;
 
-    if (memo.size() == 42 && memo[0] == '0' && memo[1] == 'x') {
+    waivelist_table_t waivelist_table(get_self(), get_self().value);
+
+    if (waivelist_table.find(from.value) != waivelist_table.end()) {
+        waive_fee = true;
+    }
+    else if (memo.size() == 42 && memo[0] == '0' && memo[1] == 'x') {
         auto address_bytes = from_hex(memo);
         if (!!address_bytes && address_bytes->size() == kAddressLength) {
             auto reserved_addr = silkworm::make_reserved_address(from.value);
@@ -548,6 +553,28 @@ void erc20::removeegress(const std::vector<name>& accounts) {
     for(const name& account : accounts)
         if(auto it = egresslist_table.find(account.value); it != egresslist_table.end())
             egresslist_table.erase(it);
+}
+
+void erc20::addwaive(const std::vector<name>& accounts) {
+    require_auth(get_self());
+
+    waivelist_table_t waivelist_table(get_self(), get_self().value);
+
+    for(const name& account : accounts)
+        if(waivelist_table.find(account.value) == waivelist_table.end())
+            waivelist_table.emplace(get_self(), [&](waive_fee_account& a) {
+                a.account = account;
+            });
+}
+
+void erc20::removewaive(const std::vector<name>& accounts) {
+    require_auth(get_self());
+
+    waivelist_table_t waivelist_table(get_self(), get_self().value);
+
+    for(const name& account : accounts)
+        if(auto it = waivelist_table.find(account.value); it != waivelist_table.end())
+            waivelist_table.erase(it);
 }
 
 void erc20::withdrawfee(eosio::name token_contract, eosio::asset quantity, eosio::name to, std::string memo) {
