@@ -71,6 +71,7 @@ class [[eosio::contract]] erc20 : public contract {
 
     [[eosio::action]] void setegressfee(eosio::name token_contract, eosio::symbol_code token_symbol_code, const eosio::asset &egress_fee);
     [[eosio::action]] void setingressfee(eosio::name token_contract, eosio::asset ingress_fee);
+    [[eosio::action]] void setminingres(eosio::name token_contract, eosio::asset min_ingress);
     [[eosio::action]] void withdrawfee(eosio::name token_contract, eosio::asset quantity, eosio::name to, std::string memo);
 
     [[eosio::action]] void unregtoken(eosio::name eos_contract_name, eosio::symbol_code token_symbol_code);
@@ -112,6 +113,7 @@ class [[eosio::contract]] erc20 : public contract {
         uint8_t erc20_precision = 0;
         eosio::binary_extension<bool> from_evm_to_native{false};
         eosio::binary_extension<bytes> original_erc20_token_address; // set if token is originated from EVM
+        eosio::binary_extension<eosio::asset> min_ingress;
 
         uint64_t primary_key() const {
             return id;
@@ -130,7 +132,7 @@ class [[eosio::contract]] erc20 : public contract {
             return false;
         }
 
-        EOSLIB_SERIALIZE(token_t, (id)(token_contract)(address)(ingress_fee)(balance)(fee_balance)(erc20_precision)(from_evm_to_native)(original_erc20_token_address));
+        EOSLIB_SERIALIZE(token_t, (id)(token_contract)(address)(ingress_fee)(balance)(fee_balance)(erc20_precision)(from_evm_to_native)(original_erc20_token_address)(min_ingress));
     };
     typedef eosio::multi_index<"tokens"_n, token_t,
                                indexed_by<"by.symbol"_n, const_mem_fun<token_t, uint128_t, &token_t::by_contract_symbol> >,
