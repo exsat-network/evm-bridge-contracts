@@ -1010,6 +1010,45 @@ try {
 }
 FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE(it_set_min_ingress, it_tester)
+try {
+    evm_eoa evm1;
+    // Give evm1 some EOS
+    transfer_token(eos_token_account, "alice"_n, evm_account, make_asset(1000000, eos_token_symbol), evm1.address_0x().c_str());
+    produce_block();
+
+    push_action(erc20_account, "setminingres"_n, erc20_account, 
+        mvo()("token_contract", token_account)("min_ingress", make_asset(10000101, token_symbol)));
+
+    produce_block();
+
+    BOOST_REQUIRE_EXCEPTION(transfer_token(token_account, "alice"_n, erc20_account, make_asset(10000100, token_symbol), evm1.address_0x().c_str()),
+            eosio_assert_message_exception, eosio_assert_message_is("transfer below min ingress value"));
+
+    push_action(erc20_account, "setminingres"_n, erc20_account, 
+        mvo()("token_contract", token_account)("min_ingress", make_asset(10000100, token_symbol)));
+
+    transfer_token(token_account, "alice"_n, erc20_account, make_asset(10000100, token_symbol), evm1.address_0x().c_str());
+    auto bal = balanceOf(evm1.address_0x().c_str());
+    BOOST_REQUIRE(bal == 1000000000); // +1000010000 - 10000, 1000 USDT
+    BOOST_REQUIRE(89999900 == get_balance("alice"_n, token_account, symbol::from_string("4,USDT")).get_amount());
+    BOOST_REQUIRE(10000100 == get_balance(erc20_account, token_account, symbol::from_string("4,USDT")).get_amount()); 
+    auto tokenInfo = getRegistedTokenInfo();
+    BOOST_REQUIRE(tokenInfo.balance == make_asset(10000000, token_symbol));
+    BOOST_REQUIRE(tokenInfo.fee_balance == make_asset(100, token_symbol));
+    produce_block();
+
+    BOOST_REQUIRE_EXCEPTION(push_action(erc20_account, "setminingres"_n, erc20_account, 
+        mvo()("token_contract", token_account)("min_ingress", make_asset(0, symbol::from_string("4,USDC"))));,
+            eosio_assert_message_exception, eosio_assert_message_is("token not registered"));
+
+    BOOST_REQUIRE_EXCEPTION(push_action(erc20_account, "setminingres"_n, erc20_account, 
+        mvo()("token_contract", token_account)("min_ingress", make_asset(0, symbol::from_string("2,USDT"))));,
+            eosio_assert_message_exception, eosio_assert_message_is("incorrect precision for registered token"));
+
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_FIXTURE_TEST_CASE(it_set_egress_fee, it_tester)
 try {
     constexpr intx::uint256 minimum_natively_representable = intx::exp(10_u256, intx::uint256(18 - 4));

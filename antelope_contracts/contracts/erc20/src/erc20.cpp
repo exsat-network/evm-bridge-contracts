@@ -462,6 +462,11 @@ void erc20::transfer(eosio::name from, eosio::name to, eosio::asset quantity,
     auto itr = index.find(token_symbol_key(get_first_receiver(), quantity.symbol.code()));
 
     eosio::check(itr != index.end() && itr->ingress_fee.symbol == quantity.symbol, "received unregistered token");
+    
+    // extra check on amount can screen out default cases.
+    if (itr->min_ingress.has_value() && itr->min_ingress.value().amount > 0) {
+        eosio::check(quantity >= itr->min_ingress.value(), "transfer below min ingress value");
+    }
 
     bool waive_fee = false;
 
@@ -609,6 +614,22 @@ void erc20::setingressfee(eosio::name token_contract, eosio::asset ingress_fee) 
 
     token_table.modify(*itr, _self, [&](auto &v) {
         v.ingress_fee = ingress_fee;
+    });
+}
+
+void erc20::setminingres(eosio::name token_contract, eosio::asset min_ingress) {
+    require_auth(get_self());
+
+    token_table_t token_table(_self, _self.value);
+    auto index = token_table.get_index<"by.symbol"_n>();
+    auto itr = index.find(token_symbol_key(token_contract, min_ingress.symbol.code()));
+
+    eosio::check(itr != index.end(), "token not registered");
+    eosio::check(itr->ingress_fee.symbol == min_ingress.symbol, "incorrect precision for registered token");
+    eosio::check(min_ingress.amount >= 0, "ingress fee can not be negative");
+
+    token_table.modify(*itr, _self, [&](auto &v) {
+        v.min_ingress = min_ingress;
     });
 }
 
